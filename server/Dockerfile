@@ -1,6 +1,9 @@
 FROM node:22-alpine AS builder
 WORKDIR /app
 
+# prisma.config.ts requires POSTGRESQL_URL when Prisma loads the config; `generate` does not connect.
+ENV POSTGRESQL_URL=postgresql://build:build@127.0.0.1:5432/build?schema=public
+
 COPY package*.json ./
 RUN npm install
 
