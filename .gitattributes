@@ -1,2 +1,2 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+# Shell scripts must use LF so bash/WSL/Git Bash do not see stray CR as part of tokens.
+*.sh text eol=lf
