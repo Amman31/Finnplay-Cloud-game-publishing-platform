@@ -1,5 +1,10 @@
 # FinnPlay — Game Publishing Platform
 
+# 🎬 IMPORTANT: PROJECT VIDEO LINK
+
+## 👉 WATCH HERE (CLICK THE LINK BELOW)
+### https://lut-my.sharepoint.com/:v:/g/personal/mohammad_amman_student_lut_fi/IQAZxXudTnfcS7MW-8KxZIFTASSxU1h8p6jVP86wyTH2sJE?e=AM0A3X&nav=eyJyZWZlcnJhbEluZm8iOnsicmVmZXJyYWxBcHAiOiJTdHJlYW1XZWJBcHAiLCJyZWZlcnJhbFZpZXciOiJTaGFyZURpYWxvZy1MaW5rIiwicmVmZXJyYWxBcHBQbGF0Zm9ybSI6IldlYiIsInJlZmVycmFsTW9kZSI6InZpZXcifX0%3D
+
 ## New Here? Start Here
 
 If you are new to cloud/deployment, follow this first:
