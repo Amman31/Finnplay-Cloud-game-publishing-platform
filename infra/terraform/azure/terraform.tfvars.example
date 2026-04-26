@@ -2,14 +2,18 @@
 #   cp terraform.tfvars.example terraform.tfvars
 
 resource_group_name = "finnplay-rg"
-location            = "swedencentral"
+location            = "westeurope"
 name_prefix         = "finnplay"
 admin_username      = "azureuser"
 
 # Output of: cat ~/.ssh/id_rsa.pub   (use the same key pair as GitHub Actions SWARM_MANAGER_SSH_KEY if you use CD)
 admin_ssh_public_key = "ssh-rsa AAAAB3... comment"
 
-vm_size = "Standard_B2s"
+# Bsv2 burstable; widely available in West Europe. Change if SkuNotAvailable in your region.
+vm_size = "Standard_B2ls_v2"
+
+# Optional: try "1", "2", or "3" if a size is unavailable without changing region.
+# vm_zone = "2"
 
 # Optional overrides:
 # vnet_address_space      = ["10.10.0.0/16"]

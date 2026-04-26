@@ -106,7 +106,7 @@ From the repository root:
 
 **Notes for Azure for Students**
 
-- If **`Standard_B2s`** is unavailable in your region, set **`location`** to `westeurope`, `northeurope`, or `eastus`, or set **`vm_size`** to something your subscription allows (e.g. **`Standard_B1s`** — less RAM; may be tight for the full stack).
+- Default Terraform **`vm_size`** is **`Standard_B2ls_v2`** (Bsv2 burstable, 2 vCPU / 4 GiB) in **`westeurope`** by default. If **`SkuNotAvailable`** appears, set **`vm_size`** to another allowed SKU (e.g. **`Standard_B1s`**, **`Standard_B2s_v2`**) or change **`location`** / **`vm_zone`** (see troubleshooting table).
 - Images: **Ubuntu 22.04 LTS** (Canonical Jammy marketplace image).
 
 ### Option B — Azure Portal (manual outline)
@@ -114,7 +114,7 @@ From the repository root:
 1. Portal → **Resource group** → create `finnplay-rg` (or your name) in your chosen region.
 2. **Virtual network** → address space `10.10.0.0/16` → subnet `10.10.1.0/24`.
 3. **Network security group** → attach to the subnet (or to each NIC) → rules as listed above.
-4. **Linux VM** `finnplay-manager` → Ubuntu 22.04 → size **B2s** (or allowed) → subnet → **public IP** → SSH public key.
+4. **Linux VM** `finnplay-manager` → Ubuntu 22.04 → size **Standard_B2ls_v2** (or another allowed SKU) → subnet → **public IP** → SSH public key.
 5. Second **Linux VM** `finnplay-worker` → same subnet → **no public IP** → same NSG rules via subnet or NIC.
 
 ### Get the manager public IP (DNS and SSH)
@@ -516,6 +516,9 @@ npm run production:down
 | 502 from Traefik | `docker service logs` for **nginx**, **client**, **server**; confirm `traefik.swarm.network=finnplay_public` in `stack.yml` matches stack name **`finnplay`**. |
 | GHCR pull denied | Set **`GHCR_PULL_TOKEN`** or make packages public; `docker login` on manager. |
 | CD fails “Install Node.js” | Install Node on manager (Part 5). |
+| Terraform `apply` fails on **`azurerm_network_security_rule`** with **ResourceNotFound** for the NSG | Use the current repo config: rules are defined **inline** on `azurerm_network_security_group` (one ARM update). Pull latest `infra/terraform/azure/main.tf`, then **`terraform apply`** again. If state still lists old `azurerm_network_security_rule.*` resources, let Terraform destroy them on the next apply. |
+| **`already exists` … `azurerm_network_interface` … needs to be imported** | A previous partial apply left the NIC in Azure but not in Terraform state. From `infra/terraform/azure/`, build the import ID (use your real subscription, resource group, and `name_prefix` from `terraform.tfvars`): `SUB="$(az account show --query id -o tsv)"` then `terraform import azurerm_network_interface.manager "/subscriptions/$SUB/resourceGroups/finnplay-rg/providers/Microsoft.Network/networkInterfaces/finnplay-manager-nic"`. After at least one successful apply, you can also use **`terraform output -raw manager_network_interface_import_id`**. Then run **`terraform apply`** again. Alternatively, delete the orphan NIC in the Azure Portal if it is **not** attached to a VM you need, then apply. |
+| **`SkuNotAvailable`** for your chosen **`vm_size`** | Set **`vm_size`** to another SKU your subscription offers in that region (e.g. **`Standard_B1s`**, **`Standard_B2s_v2`**, **`Standard_B2ls_v2`**), change **`location`**, or set **`vm_zone = "1"`** / **`"2"`** / **`"3"`** (see `infra/terraform/azure/variables.tf`) and retry **`terraform apply`**. Manager and worker VMs are created **in sequence** so the first allocation error is easier to spot. |
 
 ---
 

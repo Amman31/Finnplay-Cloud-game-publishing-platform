@@ -169,7 +169,7 @@ Short version:
 az login
 cd infra/terraform/azure
 cp terraform.tfvars.example terraform.tfvars
-# Edit terraform.tfvars: set location, resource_group_name, admin_ssh_public_key, etc.
+# Edit terraform.tfvars: set admin_ssh_public_key (and region/vm_size if you differ from westeurope + Standard_B2ls_v2).
 terraform init
 terraform apply
 terraform output -raw manager_public_ip

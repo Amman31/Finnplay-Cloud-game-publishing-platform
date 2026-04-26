@@ -30,8 +30,15 @@ variable "admin_ssh_public_key" {
 
 variable "vm_size" {
   type        = string
-  description = "VM SKU for manager and worker (e.g. Standard_B2s)."
-  default     = "Standard_B2s"
+  description = "VM SKU for manager and worker. Default is Bsv2 burstable (Standard_B2ls_v2); override if your subscription or region does not offer it (e.g. Standard_B1s, Standard_B2s)."
+  default     = "Standard_B2ls_v2"
+}
+
+variable "vm_zone" {
+  type        = string
+  default     = null
+  nullable    = true
+  description = "Optional single availability zone for both VMs: \"1\", \"2\", or \"3\". Set when Azure reports capacity restrictions without a better SKU."
 }
 
 variable "vnet_address_space" {
