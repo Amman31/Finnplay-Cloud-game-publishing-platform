@@ -1,0 +1,22 @@
+# Build-only compose: produces images tagged for Swarm (stack.local.yml / stack.yml).
+# From repo root: docker compose -f infra/local/docker-compose.build.yml --env-file .env build
+#
+# Required in .env: REGISTRY_PREFIX, IMAGE_TAG, NEXT_PUBLIC_API_URL (for local Swarm HTTP API origin).
+
+services:
+  server:
+    build:
+      context: ../../server
+    image: ${REGISTRY_PREFIX}/finnplay-server:${IMAGE_TAG}
+
+  client:
+    build:
+      context: ../../client
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    image: ${REGISTRY_PREFIX}/finnplay-client:${IMAGE_TAG}
+
+  python-service:
+    build:
+      context: ../../python-service
+    image: ${REGISTRY_PREFIX}/finnplay-python-service:${IMAGE_TAG}

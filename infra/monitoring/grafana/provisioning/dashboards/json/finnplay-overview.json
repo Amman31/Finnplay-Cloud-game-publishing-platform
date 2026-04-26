@@ -1,0 +1,49 @@
+{
+  "id": null,
+  "uid": "finnplay-overview",
+  "title": "FinnPlay Overview",
+  "schemaVersion": 38,
+  "version": 1,
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Node Process CPU Seconds",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "rate(process_cpu_seconds_total[1m])",
+          "legendFormat": "{{instance}}"
+        }
+      ]
+    },
+    {
+      "type": "timeseries",
+      "title": "Python Requests Total",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum by (path) (finnplay_python_requests_total)",
+          "legendFormat": "{{path}}"
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Application Logs",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "{service=~\"finnplay_.*\"}"
+        }
+      ],
+      "datasource": {
+        "type": "loki",
+        "uid": "Loki"
+      }
+    }
+  ],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timezone": "",
+  "refresh": "10s"
+}

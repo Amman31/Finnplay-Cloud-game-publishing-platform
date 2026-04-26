@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: FinnPlay
+    orgId: 1
+    folder: FinnPlay
+    type: file
+    disableDeletion: false
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/json

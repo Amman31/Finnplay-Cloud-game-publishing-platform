@@ -1,0 +1,212 @@
+version: "3.9"
+
+networks:
+  public:
+    driver: overlay
+    attachable: true
+  internal:
+    driver: overlay
+    attachable: true
+  monitoring:
+    driver: overlay
+    attachable: true
+
+volumes:
+  postgres_data:
+  traefik_letsencrypt:
+  grafana_data:
+  loki_data:
+  portainer_data:
+
+services:
+  traefik:
+    image: traefik:v3.6
+    command:
+      - --configFile=/etc/traefik/traefik.yml
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 443
+        published: 443
+        protocol: tcp
+        mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - ../traefik/traefik.yml:/etc/traefik/traefik.yml:ro
+      - traefik_letsencrypt:/letsencrypt
+    environment:
+      - TRAEFIK_ACME_EMAIL=${TRAEFIK_ACME_EMAIL}
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+      labels:
+        - traefik.enable=true
+        - traefik.http.routers.traefik.rule=Host(`${TRAEFIK_DASHBOARD_HOST}`)
+        - traefik.http.routers.traefik.entrypoints=websecure
+        - traefik.http.routers.traefik.tls.certresolver=letsencrypt
+        - traefik.http.routers.traefik.service=api@internal
+        - traefik.http.services.traefik.loadbalancer.server.port=8080
+    networks:
+      - public
+      - monitoring
+
+  nginx:
+    image: nginx:1.27-alpine
+    volumes:
+      - ../nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.swarm.network=finnplay_public
+        - traefik.http.routers.frontend.rule=Host(`${APP_HOST}`)
+        - traefik.http.routers.frontend.entrypoints=websecure
+        - traefik.http.routers.frontend.tls.certresolver=letsencrypt
+        - traefik.http.services.frontend.loadbalancer.server.port=80
+    networks:
+      - public
+      - internal
+
+  client:
+    image: ${REGISTRY_PREFIX}/finnplay-client:${IMAGE_TAG}
+    environment:
+      - PORT=3000
+      - NEXT_PUBLIC_API_URL=https://${API_HOST}/api
+    deploy:
+      replicas: 1
+    networks:
+      - internal
+
+  server:
+    image: ${REGISTRY_PREFIX}/finnplay-server:${IMAGE_TAG}
+    environment:
+      - PORT=5000
+      - POSTGRESQL_URL=${POSTGRESQL_URL}
+      - JWT_SECRET=${JWT_SECRET}
+      - FRONTEND_URL=https://${APP_HOST}
+      - PYTHON_SERVICE_URL=http://python-service:8000
+      - AZURE_STORAGE_CONNECTION_STRING=${AZURE_STORAGE_CONNECTION_STRING}
+      - AZURE_STORAGE_CONTAINER_NAME=${AZURE_STORAGE_CONTAINER_NAME}
+      - AZURE_STORAGE_PUBLIC_ORIGIN=${AZURE_STORAGE_PUBLIC_ORIGIN}
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.swarm.network=finnplay_public
+        - traefik.http.routers.api.rule=Host(`${API_HOST}`)
+        - traefik.http.routers.api.entrypoints=websecure
+        - traefik.http.routers.api.tls.certresolver=letsencrypt
+        - traefik.http.services.api.loadbalancer.server.port=5000
+    networks:
+      - public
+      - internal
+      - monitoring
+
+  python-service:
+    image: ${REGISTRY_PREFIX}/finnplay-python-service:${IMAGE_TAG}
+    environment:
+      - POSTGRESQL_URL=${POSTGRESQL_URL}
+    deploy:
+      replicas: 1
+    networks:
+      - internal
+      - monitoring
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+    networks:
+      - internal
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.swarm.network=finnplay_public
+        - traefik.http.routers.prometheus.rule=Host(`${PROMETHEUS_HOST}`)
+        - traefik.http.routers.prometheus.entrypoints=websecure
+        - traefik.http.routers.prometheus.tls.certresolver=letsencrypt
+        - traefik.http.services.prometheus.loadbalancer.server.port=9090
+    networks:
+      - monitoring
+      - public
+
+  loki:
+    image: grafana/loki:3.2.1
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ../monitoring/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    networks:
+      - monitoring
+
+  promtail:
+    image: grafana/promtail:3.2.1
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ../monitoring/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ../monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    deploy:
+      labels:
+        - traefik.enable=true
+        - traefik.swarm.network=finnplay_public
+        - traefik.http.routers.grafana.rule=Host(`${GRAFANA_HOST}`)
+        - traefik.http.routers.grafana.entrypoints=websecure
+        - traefik.http.routers.grafana.tls.certresolver=letsencrypt
+        - traefik.http.services.grafana.loadbalancer.server.port=3000
+    networks:
+      - monitoring
+      - public
+
+  portainer-agent:
+    image: portainer/agent:2.21.1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+    networks:
+      - internal
+    deploy:
+      mode: global
+
+  portainer:
+    image: portainer/portainer-ce:2.21.1
+    command: -H tcp://tasks.portainer-agent:9001 --tlsskipverify
+    volumes:
+      - portainer_data:/data
+    deploy:
+      placement:
+        constraints: [node.role == manager]
+      labels:
+        - traefik.enable=true
+        - traefik.swarm.network=finnplay_public
+        - traefik.http.routers.portainer.rule=Host(`${PORTAINER_HOST}`)
+        - traefik.http.routers.portainer.entrypoints=websecure
+        - traefik.http.routers.portainer.tls.certresolver=letsencrypt
+        - traefik.http.services.portainer.loadbalancer.server.port=9000
+    networks:
+      - internal
+      - public

@@ -1,0 +1,30 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: finnplay-postgres-dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: finnplay
+      POSTGRES_USER: finnplay
+      POSTGRES_PASSWORD: finnplay_dev_password
+    # Host port 5433 avoids clashing with a local PostgreSQL install on Windows/macOS (often already on 5432).
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+
+  # Azurite = local Azure Blob API. Your app still uses a *blob container* name (e.g. finnplay-images in server/.env).
+  azurite:
+    image: mcr.microsoft.com/azure-storage/azurite
+    container_name: finnplay-azurite-dev
+    restart: unless-stopped
+    # --skipApiVersionCheck: Azurite lags behind the API version shipped with @azure/storage-blob
+    command: azurite --blobHost 0.0.0.0 --blobPort 10000 --skipApiVersionCheck
+    ports:
+      - "10000:10000"
+    volumes:
+      - azurite_dev_data:/data
+
+volumes:
+  postgres_dev_data:
+  azurite_dev_data:
