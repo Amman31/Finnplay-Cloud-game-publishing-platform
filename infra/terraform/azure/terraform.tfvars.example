@@ -1,0 +1,16 @@
+# Copy to terraform.tfvars (gitignored) and fill in your values.
+#   cp terraform.tfvars.example terraform.tfvars
+
+resource_group_name = "finnplay-rg"
+location            = "swedencentral"
+name_prefix         = "finnplay"
+admin_username      = "azureuser"
+
+# Output of: cat ~/.ssh/id_rsa.pub   (use the same key pair as GitHub Actions SWARM_MANAGER_SSH_KEY if you use CD)
+admin_ssh_public_key = "ssh-rsa AAAAB3... comment"
+
+vm_size = "Standard_B2s"
+
+# Optional overrides:
+# vnet_address_space      = ["10.10.0.0/16"]
+# subnet_address_prefix   = "10.10.1.0/24"

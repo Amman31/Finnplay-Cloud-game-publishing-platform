@@ -142,3 +142,16 @@ dist
 # Python
 **/__pycache__/
 *.py[cod]
+
+# Terraform (keep lock file committed for reproducible provider versions)
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+*.tfvars
+!*.tfvars.example

@@ -14,7 +14,7 @@ This guide deploys the **FinnPlay** stack to **two Ubuntu VMs** on Azure, fronte
 1. Microsoft account with **Azure for Students** (or any Azure subscription with quota for 2 small VMs).
 2. **GoDaddy** control panel access for `finnplay.xyz`.
 3. **GitHub** repository with this project code pushed to **`main`**.
-4. A computer with **Azure CLI**, **OpenSSH client**, and **Git** installed (`az`, `ssh`, `git` in a terminal).
+4. A computer with **Terraform** (≥ 1.3), **Azure CLI**, **OpenSSH client**, and **Git** installed (`terraform`, `az`, `ssh`, `git` in a terminal). Terraform drives the recommended Azure provisioning path; the Azure CLI is still used for `az login` (unless you use a service principal) and for optional queries.
 
 ---
 
@@ -37,48 +37,96 @@ Your root `.env` on the manager must use **exactly** these values for `APP_HOST`
 
 ## Part 1 — Create Azure resources (resource group + network + VMs)
 
-You can use **either** the Azure Portal (click-through) **or** the automation script in this repo.
+**Recommended: Terraform** (`infra/terraform/azure/`). It declares the full Azure footprint for this project, lets Azure build resources in a consistent dependency order (which avoids many “resource not found” / provider-registration races), and gives you **`terraform plan`**, state, and **`terraform destroy`** for teardown.
 
-### Option A — Automated script (fastest)
+Install [Terraform](https://developer.hashicorp.com/terraform/install) and the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli). Authenticate for Terraform using **one** of these:
 
-From your **laptop**, in the repository root:
+- **Interactive (typical for students):** run `az login` and pick the subscription that has credits. The AzureRM provider uses your Azure CLI session by default.
+- **CI / automation:** create a service principal and export `ARM_CLIENT_ID`, `ARM_CLIENT_SECRET`, `ARM_TENANT_ID`, and `ARM_SUBSCRIPTION_ID` (see [HashiCorp: authenticate to Azure with the Azure CLI](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/guides/azure_cli)).
 
-```bash
-az login
-```
+### Option A — Terraform (recommended)
 
-Pick the subscription that has credits (Azure for Students).
+From the repository root:
 
-```bash
-bash infra/azure/setup-azure.sh finnplay-rg westeurope Standard_B2s azureuser
-```
+1. **SSH key:** Terraform provisions Linux VMs with **public-key SSH only** (no `az vm create --generate-ssh-keys`). Use the **same** key pair you intend to use for **GitHub Actions CD** (`SWARM_MANAGER_SSH_KEY` must be the **private** key matching this public key).
 
-**What this script creates**
+   ```bash
+   ssh-keygen -t rsa -b 4096 -f ~/.ssh/finnplay-azure -N ""
+   ```
 
-- Resource group: `finnplay-rg` (change the first argument if you want another name)
-- Virtual network + subnet (`10.10.0.0/16`, `10.10.1.0/24`)
-- Network security group (NSG) allowing:
-  - **TCP 22** (SSH)
-  - **TCP 80** (HTTP — needed for Let’s Encrypt HTTP-01 challenge)
-  - **TCP 443** (HTTPS)
-  - **Swarm**: TCP **2377**, TCP/UDP **7946**, UDP **4789** from **VirtualNetwork** (manager ↔ worker)
-- **Manager VM** `finnplay-manager` with a **public IP** attached
-- **Worker VM** `finnplay-worker` **without** a public IP (private only)
+   Put the contents of **`~/.ssh/finnplay-azure.pub`** (or your existing `id_rsa.pub`) into `admin_ssh_public_key` in the next step.
+
+2. **Variables:** copy the example tfvars and edit values (region, resource group name, VM size, public key).
+
+   ```bash
+   cd infra/terraform/azure
+   cp terraform.tfvars.example terraform.tfvars
+   ```
+
+   At minimum set **`location`**, **`resource_group_name`**, **`admin_username`**, **`admin_ssh_public_key`**, and **`vm_size`** if you differ from the defaults.
+
+3. **Install providers and apply:**
+
+   ```bash
+   terraform init
+   terraform apply
+   ```
+
+   On first `apply`, a brand-new subscription may still be registering `Microsoft.Network` / `Microsoft.Compute`. If `apply` fails with provider or “not found” errors, run once on your machine, wait until both show **Registered**, then run **`terraform apply`** again:
+
+   ```bash
+   az provider register --namespace Microsoft.Network --wait
+   az provider register --namespace Microsoft.Compute --wait
+   ```
+
+4. **Read outputs** (DNS, SSH, Swarm join all use these):
+
+   ```bash
+   terraform output manager_public_ip
+   terraform output manager_private_ip
+   terraform output worker_private_ip
+   terraform output ssh_manager
+   ```
+
+   Save **`manager_public_ip`** as **`MANAGER_PUBLIC_IP`**, **`manager_private_ip`** as **`MANAGER_PRIVATE_IP`**, and **`worker_private_ip`** as **`WORKER_PRIVATE_IP`**.
+
+**What Terraform creates** (names default with `name_prefix = "finnplay"`)
+
+- Resource group (your `resource_group_name` variable)
+- Virtual network + subnet (`10.10.0.0/16`, `10.10.1.0/24` by default; overridable in variables)
+- NSG attached to the subnet, with rules for:
+  - **TCP 22** (SSH), **TCP 80** (HTTP — Let’s Encrypt HTTP-01), **TCP 443** (HTTPS)
+  - **Swarm:** TCP **2377**, TCP/UDP **7946**, UDP **4789** from **VirtualNetwork**
+- **`finnplay-manager`** VM with a **static** public IP (`finnplay-manager-pip`)
+- **`finnplay-worker`** VM **without** a public IP
+
+**State:** by default Terraform writes **`terraform.tfstate`** in `infra/terraform/azure/`. That file is **secret-ish** (resource IDs) and is **gitignored**. Do not commit it. For team projects, configure a [remote backend](https://developer.hashicorp.com/terraform/language/settings/backends/azurerm) (optional).
+
+**Teardown:** from `infra/terraform/azure/` run **`terraform destroy`** when you want to delete the resource group and everything inside it.
 
 **Notes for Azure for Students**
 
-- If a size like `Standard_B2s` is unavailable in your region, try `westeurope`, `northeurope`, or `eastus`, or a smaller size allowed by your subscription (e.g. `Standard_B1s` for class projects — less RAM; may be tight for everything at once).
-- The script uses **Ubuntu 22.04** (`Ubuntu2204` image).
+- If **`Standard_B2s`** is unavailable in your region, set **`location`** to `westeurope`, `northeurope`, or `eastus`, or set **`vm_size`** to something your subscription allows (e.g. **`Standard_B1s`** — less RAM; may be tight for the full stack).
+- Images: **Ubuntu 22.04 LTS** (Canonical Jammy marketplace image).
 
 ### Option B — Azure Portal (manual outline)
 
-1. Portal → **Create a resource** → **Resource group** → name `finnplay-rg` → region **West Europe** (or your choice) → **Create**.
-2. **Virtual network** → attach to `finnplay-rg` → address space e.g. `10.10.0.0/16` → subnet `10.10.1.0/24`.
-3. **Network security group** → create rules matching the ports listed above (SSH, HTTP, HTTPS, Swarm ports from **VirtualNetwork**).
-4. **Virtual machine** → `finnplay-manager` → Ubuntu 22.04 → size **B2s** (or allowed size) → place in VNet/subnet → **Public IP** enabled → attach NSG → create.
-5. Second **VM** → `finnplay-worker` → same VNet/subnet → **no public IP** → same NSG → create.
+1. Portal → **Resource group** → create `finnplay-rg` (or your name) in your chosen region.
+2. **Virtual network** → address space `10.10.0.0/16` → subnet `10.10.1.0/24`.
+3. **Network security group** → attach to the subnet (or to each NIC) → rules as listed above.
+4. **Linux VM** `finnplay-manager` → Ubuntu 22.04 → size **B2s** (or allowed) → subnet → **public IP** → SSH public key.
+5. Second **Linux VM** `finnplay-worker` → same subnet → **no public IP** → same NSG rules via subnet or NIC.
 
-### Get the manager public IP (you need it for DNS and SSH)
+### Get the manager public IP (DNS and SSH)
+
+After Terraform:
+
+```bash
+cd infra/terraform/azure
+terraform output -raw manager_public_ip
+```
+
+Or with the Azure CLI (works for Terraform-created VMs):
 
 ```bash
 az vm show -d -g finnplay-rg -n finnplay-manager --query publicIps -o tsv
@@ -88,13 +136,19 @@ Save this value as **`MANAGER_PUBLIC_IP`**.
 
 ### Get the manager private IP (worker join uses this)
 
-SSH to the manager (next section), then:
+After Terraform:
+
+```bash
+terraform output -raw manager_private_ip
+```
+
+Or SSH to the manager (Part 2) and run:
 
 ```bash
 hostname -I | awk '{print $1}'
 ```
 
-Or from laptop:
+Or from your laptop:
 
 ```bash
 az vm list-ip-addresses -g finnplay-rg -n finnplay-manager -o table
@@ -103,6 +157,12 @@ az vm list-ip-addresses -g finnplay-rg -n finnplay-manager -o table
 Save the **private** IP as **`MANAGER_PRIVATE_IP`**.
 
 ### Worker private IP
+
+```bash
+cd infra/terraform/azure && terraform output -raw worker_private_ip
+```
+
+Or:
 
 ```bash
 az vm list-ip-addresses -g finnplay-rg -n finnplay-worker -o table
@@ -120,7 +180,7 @@ Replace `MANAGER_PUBLIC_IP` and `azureuser` if you used a different admin name.
 ssh azureuser@MANAGER_PUBLIC_IP
 ```
 
-If `az vm create` generated keys, use the path Azure printed, or reset password/SSH key in Portal if needed.
+Use the **private** SSH key that matches **`admin_ssh_public_key`** in your `terraform.tfvars`. If you lose it, add a new public key in the Azure Portal (VM → Reset password / SSH public key).
 
 ---
 
@@ -156,7 +216,7 @@ Copy the entire token string — call it **`WORKER_JOIN_TOKEN`**.
 
 ## Part 4 — Join the worker VM to the Swarm
 
-The worker VM has **no public IP** in the default script. From your **laptop**, open an SSH session **through the manager** (jump host):
+The worker VM has **no public IP** in the default Terraform layout. From your **laptop**, open an SSH session **through the manager** (jump host):
 
 ```bash
 ssh -J azureuser@MANAGER_PUBLIC_IP azureuser@WORKER_PRIVATE_IP
@@ -463,10 +523,10 @@ npm run production:down
 
 | Path | Role |
 |------|------|
+| `infra/terraform/azure/` | Terraform: resource group, VNet, subnet, NSG, public IP, two Ubuntu 22.04 VMs. |
 | `infra/swarm/stack.yml` | Production Swarm stack (HTTPS, Let’s Encrypt). |
 | `infra/traefik/traefik.yml` | Traefik static config (Swarm provider, ACME). |
-| `infra/azure/setup-azure.sh` | Creates RG, VNet, NSG, two VMs. |
-| `infra/azure/bootstrap-swarm.sh` | Reference for Docker install + join (optional if you followed Parts 3–4). |
+| `infra/azure/bootstrap-swarm.sh` | Optional on-VM helper for Docker install + Swarm join (same commands as Parts 3–4). |
 | `scripts/stack-deploy-production.cjs` | Loads `.env` + runs `docker stack deploy` (works when CLI has no `--env-file`). |
 | `.github/workflows/ci.yml` | CI only. |
 | `.github/workflows/cd.yml` | Build → push GHCR → SSH deploy. |
@@ -475,8 +535,8 @@ npm run production:down
 
 ## Summary — ordered checklist
 
-1. `az login` → run `infra/azure/setup-azure.sh …` (or create resources in Portal).
-2. NSG has **80/443/22** + **Swarm** ports (script includes them).
+1. `az login` → **`cd infra/terraform/azure`**, configure `terraform.tfvars`, **`terraform init`** → **`terraform apply`** (or recreate the same layout manually in the Portal — Part 1, Option B).
+2. NSG has **80/443/22** + **Swarm** ports (defined in Terraform).
 3. SSH to manager → install Docker → `docker swarm init --advertise-addr <private IP>`.
 4. SSH to worker → install Docker → `docker swarm join …`.
 5. Manager: install **Node.js**, clone repo to `/opt/finnplay`, create `.env` with **`finnplay.xyz`** hostnames and secrets.

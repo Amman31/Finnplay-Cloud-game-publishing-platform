@@ -44,7 +44,7 @@ Before deployment, install and verify:
 - Docker Desktop (local testing)
 - Node.js 22+
 - Python 3.13+ (or 3.12+)
-- Azure CLI (`az`)
+- Azure CLI (`az`) and **Terraform** (`terraform` ≥ 1.3) for Azure infrastructure (see `docs/deployment-azure.md`)
 - A GitHub repo for this project
 - A domain name (for HTTPS in Azure), or use temporary hostnames for local testing
 
@@ -159,20 +159,23 @@ Health / UI (HTTP local Swarm; see `docs/deployment-local.md`):
 
 ## 4) Azure Deployment (Second Milestone)
 
-## Step 4.1: Login and create Azure infra
+## Step 4.1: Log in and create Azure infra (Terraform)
+
+Use **Terraform** so networking and VMs are declared in code (fewer race conditions than ad‑hoc shell scripts). Full steps, variables, and fallbacks: **`docs/deployment-azure.md`** → Part 1.
+
+Short version:
 
 ```bash
 az login
-bash infra/azure/setup-azure.sh finnplay-rg westeurope Standard_B2s azureuser
+cd infra/terraform/azure
+cp terraform.tfvars.example terraform.tfvars
+# Edit terraform.tfvars: set location, resource_group_name, admin_ssh_public_key, etc.
+terraform init
+terraform apply
+terraform output -raw manager_public_ip
 ```
 
-This creates:
-
-- resource group
-- VNet/subnet
-- NSG
-- manager VM (public IP)
-- worker VM (private)
+This creates the same topology as before: resource group, VNet/subnet, NSG (SSH, HTTP, HTTPS, Swarm ports), manager VM with a public IP, worker VM with a private IP only.
 
 ## Step 4.2: SSH into manager and worker, install Swarm
 

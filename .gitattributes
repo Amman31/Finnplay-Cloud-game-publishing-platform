@@ -1,2 +1,8 @@
 # Shell scripts must use LF so bash/WSL/Git Bash do not see stray CR as part of tokens.
 *.sh text eol=lf
+
+# Terraform and lock files: LF avoids noisy diffs on Windows.
+*.tf text eol=lf
+*.tfvars text eol=lf
+.terraform.lock.hcl text eol=lf
+*.tfvars.example text eol=lf

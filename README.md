@@ -84,7 +84,7 @@ A full-stack **game publishing platform** where developers can publish games and
 │   │   └── scripts/        # createAdmin.ts — bootstrap first admin (via npm run create-admin)
 │   └── ...
 ├── python-service/         # FastAPI microservice
-├── infra/                  # Swarm, Traefik, Nginx, monitoring, Azure scripts
+├── infra/                  # Swarm, Traefik, Nginx, monitoring; Terraform + scripts for Azure
 ├── docs/                   # Architecture and deployment runbooks
 ├── package.json            # Root scripts (concurrently run client + server)
 └── README.md
