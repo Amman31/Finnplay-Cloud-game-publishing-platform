@@ -18,6 +18,9 @@ if (fs.existsSync(envPath)) {
         if (eq <= 0) continue;
         const key = trimmed.slice(0, eq).trim();
         if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) continue;
+        if (process.env[key] !== undefined && String(process.env[key]).trim() !== '') {
+            continue;
+        }
         let val = trimmed.slice(eq + 1).trim();
         if (
             (val.startsWith('"') && val.endsWith('"')) ||
@@ -27,6 +30,11 @@ if (fs.existsSync(envPath)) {
         }
         process.env[key] = val;
     }
+}
+
+const rp = process.env.REGISTRY_PREFIX;
+if (rp && /^ghcr\.io\//i.test(rp)) {
+    process.env.REGISTRY_PREFIX = 'ghcr.io/' + rp.replace(/^ghcr\.io\//i, '').toLowerCase();
 }
 
 const composeFile = path.join('infra', 'swarm', 'stack.local.yml');
