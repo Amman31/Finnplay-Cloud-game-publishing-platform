@@ -52,3 +52,9 @@ variable "subnet_address_prefix" {
   description = "CIDR for the workload subnet."
   default     = "10.10.1.0/24"
 }
+
+variable "storage_container_name" {
+  type        = string
+  description = "Blob container for game images (matches server default AZURE_STORAGE_CONTAINER_NAME)."
+  default     = "finnplay-images"
+}

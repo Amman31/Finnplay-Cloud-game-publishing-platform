@@ -27,3 +27,24 @@ output "ssh_manager" {
   value       = "ssh ${var.admin_username}@${azurerm_public_ip.manager.ip_address}"
   description = "Example SSH command to the manager."
 }
+
+output "storage_account_name" {
+  value       = azurerm_storage_account.blob.name
+  description = "Azure Storage account name for blob uploads (AZURE_STORAGE_CONNECTION_STRING account segment)."
+}
+
+output "storage_container_name" {
+  value       = azurerm_storage_container.images.name
+  description = "Blob container name; set AZURE_STORAGE_CONTAINER_NAME on the server to this value."
+}
+
+output "storage_blob_endpoint" {
+  value       = azurerm_storage_account.blob.primary_blob_endpoint
+  description = "HTTPS blob service base URL (optional AZURE_STORAGE_PUBLIC_ORIGIN if you rewrite URLs)."
+}
+
+output "storage_primary_connection_string" {
+  value       = azurerm_storage_account.blob.primary_connection_string
+  sensitive   = true
+  description = "Use as AZURE_STORAGE_CONNECTION_STRING for the API server (treat as a secret)."
+}

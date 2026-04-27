@@ -5,6 +5,31 @@ resource "azurerm_resource_group" "main" {
   location = var.location
 }
 
+# Blob storage for uploaded game images (see server storage.service.ts / AZURE_STORAGE_* env vars).
+# Account names must be 3–24 chars, lowercase letters and numbers only (globally unique).
+locals {
+  _storage_name_prefix = lower(replace(var.name_prefix, "-", ""))
+  _storage_name_suffix = substr(md5(azurerm_resource_group.main.id), 0, 6)
+  storage_account_name = substr("${local._storage_name_prefix}st${local._storage_name_suffix}", 0, 24)
+}
+
+resource "azurerm_storage_account" "blob" {
+  name                            = local.storage_account_name
+  resource_group_name             = azurerm_resource_group.main.name
+  location                        = azurerm_resource_group.main.location
+  account_tier                    = "Standard"
+  account_replication_type        = "LRS"
+  account_kind                    = "StorageV2"
+  min_tls_version                 = "TLS1_2"
+  allow_nested_items_to_be_public = true
+}
+
+resource "azurerm_storage_container" "images" {
+  name                  = var.storage_container_name
+  storage_account_name  = azurerm_storage_account.blob.name
+  container_access_type = "blob"
+}
+
 resource "azurerm_virtual_network" "main" {
   name                = "${var.name_prefix}-vnet"
   location            = azurerm_resource_group.main.location
