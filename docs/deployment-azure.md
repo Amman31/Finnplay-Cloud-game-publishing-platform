@@ -22,6 +22,7 @@ This guide deploys the **FinnPlay** stack to **two Ubuntu VMs** on Azure, fronte
 
 Use one consistent pattern. **`APP_HOST` and `API_HOST` must never be the same string** (the deploy script refuses it): two Traefik routers cannot share one `Host()` without path-based splitting, which this stack does not use.
 
+<<<<<<< HEAD
 | Role | Subdomain pattern | Apex pattern (web at root domain) |
 |------|-------------------|-------------------------------------|
 | Web app (`APP_HOST`) | `app.finnplay.xyz` | `finnplay.xyz` |
@@ -30,6 +31,16 @@ Use one consistent pattern. **`APP_HOST` and `API_HOST` must never be the same s
 | Prometheus | `prometheus.finnplay.xyz` | `prometheus.finnplay.xyz` |
 | Portainer | `portainer.finnplay.xyz` | `portainer.finnplay.xyz` |
 | Traefik dashboard | `traefik.finnplay.xyz` | `traefik.finnplay.xyz` |
+=======
+| Role | Hostname (DNS A record) |
+|------|-------------------------|
+| Web app (Next.js via Nginx) | `finnplay.xyz` |
+| API | `api.finnplay.xyz` |
+| Grafana | `grafana.finnplay.xyz` |
+| Prometheus | `prometheus.finnplay.xyz` |
+| Portainer | `portainer.finnplay.xyz` |
+| Traefik dashboard | `traefik.finnplay.xyz` |
+>>>>>>> 6666674611bff9c12e36891b439c074d8cb00c2a
 
 In `.env`, `APP_HOST` / `API_HOST` / `*_HOST` are **hostnames only** (no `https://`, no path). CORS for the API is set in the stack to **`https://${APP_HOST}`** (see `infra/swarm/stack.yml`), so the browser origin must match **`APP_HOST`** (e.g. open `https://finnplay.xyz` if `APP_HOST=finnplay.xyz`).
 
