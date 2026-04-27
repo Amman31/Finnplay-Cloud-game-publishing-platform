@@ -24,7 +24,7 @@ Use one consistent pattern. Below we assume:
 
 | Role | Hostname (DNS A record) |
 |------|-------------------------|
-| Web app (Next.js via Nginx) | `app.finnplay.xyz` |
+| Web app (Next.js via Nginx) | `finnplay.xyz` |
 | API | `api.finnplay.xyz` |
 | Grafana | `grafana.finnplay.xyz` |
 | Prometheus | `prometheus.finnplay.xyz` |
