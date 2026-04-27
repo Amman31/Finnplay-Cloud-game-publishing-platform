@@ -66,6 +66,17 @@ if (appHost === apiHost) {
     process.exit(1);
 }
 
+// Let's Encrypt rejects invalid / empty contacts; Traefik then falls back to "TRAEFIK DEFAULT CERT" (browser: ERR_CERT_AUTHORITY_INVALID).
+const acmeEmail = String(process.env.TRAEFIK_ACME_EMAIL || '').trim();
+if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(acmeEmail)) {
+    console.error(
+        "Deploy aborted: TRAEFIK_ACME_EMAIL must be a real mailbox Let's Encrypt can use (e.g. you@gmail.com).\n" +
+            'No spaces, no angle brackets, no `mailto:`. Fix it in /opt/finnplay/.env then redeploy.\n' +
+            'If Traefik logs showed invalidContact / unable to parse email address, this was the cause.'
+    );
+    process.exit(1);
+}
+
 const composeFile = path.join('infra', 'swarm', 'stack.yml');
 const result = spawnSync('docker', ['stack', 'deploy', '-c', composeFile, 'finnplay'], {
     cwd: root,

@@ -16,7 +16,9 @@ api:
 certificatesResolvers:
   letsencrypt:
     acme:
-      email: ${TRAEFIK_ACME_EMAIL}
+      # Email is set in infra/swarm/stack.yml via CLI (--certificatesresolvers.letsencrypt.acme.email=…)
+      # so Docker substitutes ${TRAEFIK_ACME_EMAIL} at deploy time. A literal ${…} in this mounted file
+      # is often NOT expanded by Traefik, which breaks Let's Encrypt (invalidContact / unable to parse email).
       storage: /letsencrypt/acme.json
       httpChallenge:
         entryPoint: web

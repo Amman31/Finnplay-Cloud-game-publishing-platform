@@ -23,6 +23,8 @@ services:
     image: traefik:v3.6
     command:
       - --configFile=/etc/traefik/traefik.yml
+      # ACME contact must be substituted here (compose env); traefik.yml ${VAR} in a bind-mounted file is not reliably expanded.
+      - --certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL}
     ports:
       - target: 80
         published: 80
@@ -46,6 +48,7 @@ services:
         - traefik.http.routers.traefik.rule=Host(`${TRAEFIK_DASHBOARD_HOST}`)
         - traefik.http.routers.traefik.entrypoints=websecure
         - traefik.http.routers.traefik.tls.certresolver=letsencrypt
+        - traefik.http.routers.traefik.tls.domains[0].main=${TRAEFIK_DASHBOARD_HOST}
         - traefik.http.routers.traefik.service=api@internal
         - traefik.http.services.traefik.loadbalancer.server.port=8080
     networks:

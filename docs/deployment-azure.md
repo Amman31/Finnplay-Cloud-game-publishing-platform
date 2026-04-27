@@ -329,7 +329,7 @@ AZURE_STORAGE_CONTAINER_NAME=finnplay-images
 - **`POSTGRESQL_URL`** must use hostname **`postgres`** (the Swarm service name), not `localhost`.
 - **Do not set `API_HOST` to the same hostname as `APP_HOST`** (e.g. both `finnplay.xyz`). That breaks Traefik and produces **`ERR_CERT_AUTHORITY_INVALID`** / wrong certificate in the browser.
 - The stack sets **`FRONTEND_URL=https://${APP_HOST}`** on the server container for CORS; you do not need a separate `FRONTEND_URL` line in `.env` for `stack.yml` production deploy.
-- **`TRAEFIK_ACME_EMAIL`** is required for Let’s Encrypt registration.
+- **`TRAEFIK_ACME_EMAIL`** is required for Let’s Encrypt registration (a real mailbox). It is passed into Traefik via **`stack.yml` command-line flags** (substituted at `docker stack deploy` time), not only as a variable inside the mounted `traefik.yml` file, so Let’s Encrypt always receives a parseable address.
 - For **real Azure Blob Storage**, use your portal connection string. **Do not** use the Azurite `BlobEndpoint=http://azurite:...` string from local docs on Azure VMs unless you actually run Azurite there.
 - **`AZURE_STORAGE_PUBLIC_ORIGIN`**: leave **empty** in real Azure if public blob URLs from the SDK are already HTTPS and browser-reachable. Use it only when you intentionally rewrite blob hosts (see `docs/deployment-local.md`).
 
@@ -525,7 +525,7 @@ npm run production:down
 
 | Symptom | What to check |
 |---------|----------------|
-| Let’s Encrypt / certificate errors (`ERR_CERT_AUTHORITY_INVALID`) | Port **80** open to the internet; **every** public hostname (`APP_HOST`, `API_HOST`, …) has an **A** record to the manager; `TRAEFIK_ACME_EMAIL` set; **`APP_HOST` ≠ `API_HOST`**; redeploy after changing `.env`. Check `docker service logs finnplay_traefik --tail 100`. |
+| Let’s Encrypt / certificate errors (`ERR_CERT_AUTHORITY_INVALID`) | Port **80** open to the internet; **every** public hostname (`APP_HOST`, `API_HOST`, …) has an **A** record to the manager; **`TRAEFIK_ACME_EMAIL`** must be a **real, parseable** address (e.g. `you@gmail.com`) — if Traefik logs say **`invalidContact`** or **`unable to parse email address`**, fix `.env` and redeploy. **`APP_HOST` ≠ `API_HOST`**. Check `docker service logs finnplay_traefik --tail 100`. If certs were stuck after a bad email, remove the `traefik_letsencrypt` volume once (data loss: only LE state) and redeploy. |
 | `docker node` not Ready on worker | NSG allows Swarm ports **2377 / 7946 / 4789** from Virtual Network; worker joined with **manager private IP**. |
 | 502 from Traefik | `docker service logs` for **nginx**, **client**, **server**; confirm `traefik.swarm.network=finnplay_public` in `stack.yml` matches stack name **`finnplay`**. |
 | GHCR pull denied | Set **`GHCR_PULL_TOKEN`** or make packages public; `docker login` on manager. |
