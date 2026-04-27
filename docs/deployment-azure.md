@@ -22,25 +22,14 @@ This guide deploys the **FinnPlay** stack to **two Ubuntu VMs** on Azure, fronte
 
 Use one consistent pattern. **`APP_HOST` and `API_HOST` must never be the same string** (the deploy script refuses it): two Traefik routers cannot share one `Host()` without path-based splitting, which this stack does not use.
 
-<<<<<<< HEAD
 | Role | Subdomain pattern | Apex pattern (web at root domain) |
 |------|-------------------|-------------------------------------|
-| Web app (`APP_HOST`) | `app.finnplay.xyz` | `finnplay.xyz` |
+| Web app (`APP_HOST`, Traefik → **Nginx** → Next.js) | `app.finnplay.xyz` | `finnplay.xyz` |
 | API (`API_HOST`) | `api.finnplay.xyz` | **`api.finnplay.xyz` (keep a subdomain)** |
 | Grafana | `grafana.finnplay.xyz` | `grafana.finnplay.xyz` |
 | Prometheus | `prometheus.finnplay.xyz` | `prometheus.finnplay.xyz` |
 | Portainer | `portainer.finnplay.xyz` | `portainer.finnplay.xyz` |
 | Traefik dashboard | `traefik.finnplay.xyz` | `traefik.finnplay.xyz` |
-=======
-| Role | Hostname (DNS A record) |
-|------|-------------------------|
-| Web app (Next.js via Nginx) | `finnplay.xyz` |
-| API | `api.finnplay.xyz` |
-| Grafana | `grafana.finnplay.xyz` |
-| Prometheus | `prometheus.finnplay.xyz` |
-| Portainer | `portainer.finnplay.xyz` |
-| Traefik dashboard | `traefik.finnplay.xyz` |
->>>>>>> 6666674611bff9c12e36891b439c074d8cb00c2a
 
 In `.env`, `APP_HOST` / `API_HOST` / `*_HOST` are **hostnames only** (no `https://`, no path). CORS for the API is set in the stack to **`https://${APP_HOST}`** (see `infra/swarm/stack.yml`), so the browser origin must match **`APP_HOST`** (e.g. open `https://finnplay.xyz` if `APP_HOST=finnplay.xyz`).
 
@@ -527,7 +516,7 @@ npm run production:down
 |---------|----------------|
 | Let’s Encrypt / certificate errors (`ERR_CERT_AUTHORITY_INVALID`) | Port **80** open to the internet; **every** public hostname (`APP_HOST`, `API_HOST`, …) has an **A** record to the manager; **`TRAEFIK_ACME_EMAIL`** must be a **real, parseable** address (e.g. `you@gmail.com`) — if Traefik logs say **`invalidContact`** or **`unable to parse email address`**, fix `.env` and redeploy. **`APP_HOST` ≠ `API_HOST`**. Check `docker service logs finnplay_traefik --tail 100`. If certs were stuck after a bad email, remove the `traefik_letsencrypt` volume once (data loss: only LE state) and redeploy. |
 | `docker node` not Ready on worker | NSG allows Swarm ports **2377 / 7946 / 4789** from Virtual Network; worker joined with **manager private IP**. |
-| 502 from Traefik | `docker service logs` for **nginx**, **client**, **server**; confirm `traefik.swarm.network=finnplay_public` in `stack.yml` matches stack name **`finnplay`**. |
+| 502 from nginx (`Host not found` for `client`) | `infra/nginx/nginx.conf` must use a **literal** `proxy_pass http://client:3000` (no `$variable` + `resolver 127.0.0.11` — Swarm DNS often fails that way). Rebuild **client** so `next start` binds **`0.0.0.0:3000`**. Check `docker service logs finnplay_nginx` / `finnplay_client`. |
 | GHCR pull denied | Set **`GHCR_PULL_TOKEN`** or make packages public; `docker login` on manager. |
 | CD fails “Install Node.js” | Install Node on manager (Part 5). |
 | Terraform `apply` fails on **`azurerm_network_security_rule`** with **ResourceNotFound** for the NSG | Use the current repo config: rules are defined **inline** on `azurerm_network_security_group` (one ARM update). Pull latest `infra/terraform/azure/main.tf`, then **`terraform apply`** again. If state still lists old `azurerm_network_security_rule.*` resources, let Terraform destroy them on the next apply. |
