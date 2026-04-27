@@ -39,6 +39,33 @@ if (rp && /^ghcr\.io\//i.test(rp)) {
     process.env.REGISTRY_PREFIX = 'ghcr.io/' + rp.replace(/^ghcr\.io\//i, '').toLowerCase();
 }
 
+function hostOnlyFromEnv(name) {
+    let v = String(process.env[name] || '').trim();
+    if (/\/|:\/\//.test(v)) {
+        console.error(
+            `Deploy aborted: ${name} must be a hostname only (e.g. finnplay.xyz or api.finnplay.xyz), not a URL. Remove https:// and any path.`
+        );
+        process.exit(1);
+    }
+    return v.toLowerCase();
+}
+
+const appHost = hostOnlyFromEnv('APP_HOST');
+const apiHost = hostOnlyFromEnv('API_HOST');
+if (!appHost || !apiHost) {
+    console.error('Deploy aborted: APP_HOST and API_HOST must be set (hostname only, no https://).');
+    process.exit(1);
+}
+if (appHost === apiHost) {
+    console.error(
+        'Deploy aborted: APP_HOST and API_HOST must be different hostnames.\n' +
+            'Traefik routes the web UI and the API with separate Host() rules. If both are the same (e.g. finnplay.xyz),\n' +
+            "TLS and routing break (browser sees ERR_CERT_AUTHORITY_INVALID / wrong certificate).\n" +
+            'Use an apex or subdomain for the app (e.g. APP_HOST=finnplay.xyz) and keep the API on another host (e.g. API_HOST=api.finnplay.xyz).'
+    );
+    process.exit(1);
+}
+
 const composeFile = path.join('infra', 'swarm', 'stack.yml');
 const result = spawnSync('docker', ['stack', 'deploy', '-c', composeFile, 'finnplay'], {
     cwd: root,

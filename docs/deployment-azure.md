@@ -1,6 +1,6 @@
 # Azure production deployment (Microsoft Azure for Students + GoDaddy + GitHub Actions)
 
-This guide deploys the **FinnPlay** stack to **two Ubuntu VMs** on Azure, fronted by **Traefik** with **Let’s Encrypt HTTPS**, using your domain **`finnplay.xyz`** (example subdomains: `app.finnplay.xyz`, `api.finnplay.xyz`, …).
+This guide deploys the **FinnPlay** stack to **two Ubuntu VMs** on Azure, fronted by **Traefik** with **Let’s Encrypt HTTPS**, using your domain **`finnplay.xyz`**. The web UI can use either the **apex** (`finnplay.xyz`) or a **subdomain** (`app.finnplay.xyz`); the **API must always use a different hostname** (recommended: `api.finnplay.xyz`) because Traefik routes UI and API with separate `Host()` rules.
 
 **What you will have at the end**
 
@@ -20,18 +20,18 @@ This guide deploys the **FinnPlay** stack to **two Ubuntu VMs** on Azure, fronte
 
 ## Part 0 — Choose your hostnames (recommended)
 
-Use one consistent pattern. Below we assume:
+Use one consistent pattern. **`APP_HOST` and `API_HOST` must never be the same string** (the deploy script refuses it): two Traefik routers cannot share one `Host()` without path-based splitting, which this stack does not use.
 
-| Role | Hostname (DNS A record) |
-|------|-------------------------|
-| Web app (Next.js via Nginx) | `app.finnplay.xyz` |
-| API | `api.finnplay.xyz` |
-| Grafana | `grafana.finnplay.xyz` |
-| Prometheus | `prometheus.finnplay.xyz` |
-| Portainer | `portainer.finnplay.xyz` |
-| Traefik dashboard | `traefik.finnplay.xyz` |
+| Role | Subdomain pattern | Apex pattern (web at root domain) |
+|------|-------------------|-------------------------------------|
+| Web app (`APP_HOST`) | `app.finnplay.xyz` | `finnplay.xyz` |
+| API (`API_HOST`) | `api.finnplay.xyz` | **`api.finnplay.xyz` (keep a subdomain)** |
+| Grafana | `grafana.finnplay.xyz` | `grafana.finnplay.xyz` |
+| Prometheus | `prometheus.finnplay.xyz` | `prometheus.finnplay.xyz` |
+| Portainer | `portainer.finnplay.xyz` | `portainer.finnplay.xyz` |
+| Traefik dashboard | `traefik.finnplay.xyz` | `traefik.finnplay.xyz` |
 
-Your root `.env` on the manager must use **exactly** these values for `APP_HOST`, `API_HOST`, etc. (no `https://` in those variables).
+In `.env`, `APP_HOST` / `API_HOST` / `*_HOST` are **hostnames only** (no `https://`, no path). CORS for the API is set in the stack to **`https://${APP_HOST}`** (see `infra/swarm/stack.yml`), so the browser origin must match **`APP_HOST`** (e.g. open `https://finnplay.xyz` if `APP_HOST=finnplay.xyz`).
 
 ---
 
@@ -284,13 +284,13 @@ cp .env.example .env
 nano .env
 ```
 
-Set at least the following (example values for **`finnplay.xyz`**):
+Set at least the following. **Example A — web at apex `finnplay.xyz`:**
 
 ```env
 REGISTRY_PREFIX=ghcr.io/YOUR_GITHUB_USERNAME
 IMAGE_TAG=latest
 
-APP_HOST=app.finnplay.xyz
+APP_HOST=finnplay.xyz
 API_HOST=api.finnplay.xyz
 GRAFANA_HOST=grafana.finnplay.xyz
 PROMETHEUS_HOST=prometheus.finnplay.xyz
@@ -307,16 +307,17 @@ JWT_SECRET=LONG_RANDOM_SECRET_HERE
 GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=STRONG_GRAFANA_PASSWORD_HERE
 
-FRONTEND_URL=https://app.finnplay.xyz
-
 AZURE_STORAGE_CONNECTION_STRING=DefaultEndpointsProtocol=https;AccountName=...;AccountKey=...;EndpointSuffix=core.windows.net
 AZURE_STORAGE_CONTAINER_NAME=finnplay-images
 ```
 
+**Example B — web at `app.finnplay.xyz`:** set `APP_HOST=app.finnplay.xyz` and keep `API_HOST=api.finnplay.xyz`.
+
 **Important**
 
 - **`POSTGRESQL_URL`** must use hostname **`postgres`** (the Swarm service name), not `localhost`.
-- **`FRONTEND_URL`** must be **`https://app.finnplay.xyz`** (matches Traefik + CORS).
+- **Do not set `API_HOST` to the same hostname as `APP_HOST`** (e.g. both `finnplay.xyz`). That breaks Traefik and produces **`ERR_CERT_AUTHORITY_INVALID`** / wrong certificate in the browser.
+- The stack sets **`FRONTEND_URL=https://${APP_HOST}`** on the server container for CORS; you do not need a separate `FRONTEND_URL` line in `.env` for `stack.yml` production deploy.
 - **`TRAEFIK_ACME_EMAIL`** is required for Let’s Encrypt registration.
 - For **real Azure Blob Storage**, use your portal connection string. **Do not** use the Azurite `BlobEndpoint=http://azurite:...` string from local docs on Azure VMs unless you actually run Azurite there.
 - **`AZURE_STORAGE_PUBLIC_ORIGIN`**: leave **empty** in real Azure if public blob URLs from the SDK are already HTTPS and browser-reachable. Use it only when you intentionally rewrite blob hosts (see `docs/deployment-local.md`).
@@ -332,36 +333,38 @@ AZURE_STORAGE_CONTAINER_NAME=finnplay-images
 
 In GoDaddy: **My Products** → your domain **finnplay.xyz** → **DNS** → **Manage DNS**.
 
-### 8.1 Apex domain (optional)
+### 8.1 Apex record (`@`) — required if `APP_HOST=finnplay.xyz`
 
-If you want `https://finnplay.xyz` later, add an **A** record:
+If the web app uses the root domain, add:
 
 | Type | Name | Value | TTL |
 |------|------|-------|-----|
 | A | `@` | `MANAGER_PUBLIC_IP` | 600 |
 
-This project’s Traefik rules use **subdomains** (`app`, `api`, …). The apex record is optional unless you add a router for it.
+If you use **`APP_HOST=app.finnplay.xyz`** instead, add an **A** record for **`app`** (see below); the `@` record is optional unless you also want `https://finnplay.xyz` to resolve.
 
-### 8.2 Required subdomains (A records to the manager)
+### 8.2 Required hostnames (A records to the manager)
 
-Create **six** **A** records (same IP for all):
+Create **A** records for every hostname in your `.env` (`API_HOST`, `GRAFANA_HOST`, …). Typical set (same IP for all):
 
 | Type | Name | Value | TTL |
 |------|------|-------|-----|
-| A | `app` | `MANAGER_PUBLIC_IP` | 600 |
 | A | `api` | `MANAGER_PUBLIC_IP` | 600 |
 | A | `grafana` | `MANAGER_PUBLIC_IP` | 600 |
 | A | `prometheus` | `MANAGER_PUBLIC_IP` | 600 |
 | A | `portainer` | `MANAGER_PUBLIC_IP` | 600 |
 | A | `traefik` | `MANAGER_PUBLIC_IP` | 600 |
 
+If **`APP_HOST=app.finnplay.xyz`**, also add **A** `app` → `MANAGER_PUBLIC_IP`.
+
 **Propagation:** wait a few minutes up to 48 hours. Verify from your laptop:
 
 ```bash
-nslookup app.finnplay.xyz
+nslookup finnplay.xyz
+nslookup api.finnplay.xyz
 ```
 
-It should return `MANAGER_PUBLIC_IP`.
+(Use `nslookup app.finnplay.xyz` instead of `finnplay.xyz` if you chose the subdomain pattern for `APP_HOST`.)
 
 ---
 
@@ -420,10 +423,10 @@ docker service ps finnplay_traefik
 docker service logs finnplay_traefik --tail 80
 ```
 
-Open in a browser:
+Open in a browser (use your real `APP_HOST`):
 
-- `https://app.finnplay.xyz`
-- `https://api.finnplay.xyz/api/health`
+- `https://<APP_HOST>/` (e.g. `https://finnplay.xyz` or `https://app.finnplay.xyz`)
+- `https://<API_HOST>/api/health` (e.g. `https://api.finnplay.xyz/api/health`)
 
 ---
 
@@ -462,7 +465,7 @@ Workflow file: **`.github/workflows/cd.yml`**
 
 | Name | Example value | Purpose |
 |------|----------------|---------|
-| `API_HOST` | `api.finnplay.xyz` | **Hostname only**, no `https://`. Passed at **client image build** time as `NEXT_PUBLIC_API_URL=https://<API_HOST>/api`. |
+| `API_HOST` | `api.finnplay.xyz` | **Hostname only**, no `https://`. Passed at **client image build** time as `NEXT_PUBLIC_API_URL=https://<API_HOST>/api`. Keep this as the **API subdomain** even when `APP_HOST` is the apex (`finnplay.xyz`). |
 
 ### 12.2 Repository secrets (Settings → Secrets and variables → Actions → **Secrets**)
 
@@ -511,7 +514,7 @@ npm run production:down
 
 | Symptom | What to check |
 |---------|----------------|
-| Let’s Encrypt / certificate errors | Port **80** open to the internet; DNS **A** records point to manager; `TRAEFIK_ACME_EMAIL` set; wait for DNS propagation. |
+| Let’s Encrypt / certificate errors (`ERR_CERT_AUTHORITY_INVALID`) | Port **80** open to the internet; **every** public hostname (`APP_HOST`, `API_HOST`, …) has an **A** record to the manager; `TRAEFIK_ACME_EMAIL` set; **`APP_HOST` ≠ `API_HOST`**; redeploy after changing `.env`. Check `docker service logs finnplay_traefik --tail 100`. |
 | `docker node` not Ready on worker | NSG allows Swarm ports **2377 / 7946 / 4789** from Virtual Network; worker joined with **manager private IP**. |
 | 502 from Traefik | `docker service logs` for **nginx**, **client**, **server**; confirm `traefik.swarm.network=finnplay_public` in `stack.yml` matches stack name **`finnplay`**. |
 | GHCR pull denied | Set **`GHCR_PULL_TOKEN`** or make packages public; `docker login` on manager. |

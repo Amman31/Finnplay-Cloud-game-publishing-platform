@@ -37,6 +37,28 @@ if (rp && /^ghcr\.io\//i.test(rp)) {
     process.env.REGISTRY_PREFIX = 'ghcr.io/' + rp.replace(/^ghcr\.io\//i, '').toLowerCase();
 }
 
+function hostOnlyFromEnv(name) {
+    let v = String(process.env[name] || '').trim();
+    if (/\/|:\/\//.test(v)) {
+        console.error(`Deploy aborted: ${name} must be a hostname only, not a URL.`);
+        process.exit(1);
+    }
+    return v.toLowerCase();
+}
+
+const appHost = hostOnlyFromEnv('APP_HOST');
+const apiHost = hostOnlyFromEnv('API_HOST');
+if (!appHost || !apiHost) {
+    console.error('Deploy aborted: APP_HOST and API_HOST must be set.');
+    process.exit(1);
+}
+if (appHost === apiHost) {
+    console.error(
+        'Deploy aborted: APP_HOST and API_HOST must differ (separate Traefik Host() routers for UI vs API).'
+    );
+    process.exit(1);
+}
+
 const composeFile = path.join('infra', 'swarm', 'stack.local.yml');
 const result = spawnSync('docker', ['stack', 'deploy', '-c', composeFile, 'finnplay'], {
     cwd: root,
