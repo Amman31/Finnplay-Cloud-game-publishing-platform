@@ -6,11 +6,13 @@ import Navbar from '@/components/Navbar';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import api from '@/lib/api';
+import { getAxiosErrorMessage } from '@/lib/errors';
+import type { AnalyticsDashboardData, TopGameListRow } from '@/types/dashboard';
 
 export default function AdminDashboard() {
-    const { user, isAdmin, loading: authLoading } = useAuth();
+    const { isAdmin, loading: authLoading } = useAuth();
     const router = useRouter();
-    const [stats, setStats] = useState<any>(null);
+    const [stats, setStats] = useState<AnalyticsDashboardData | null>(null);
     const [loading, setLoading] = useState(true);
     const [statsError, setStatsError] = useState<string | null>(null);
 
@@ -31,14 +33,10 @@ export default function AdminDashboard() {
             setStatsError(null);
             const response = await api.get('/analytics/dashboard');
             setStats(response.data);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to fetch stats:', error);
             setStats(null);
-            const msg =
-                error?.response?.data?.error ||
-                error?.message ||
-                'The analytics service is unavailable.';
-            setStatsError(msg);
+            setStatsError(getAxiosErrorMessage(error, 'The analytics service is unavailable.'));
         } finally {
             setLoading(false);
         }
@@ -133,10 +131,10 @@ export default function AdminDashboard() {
                         <h2 className="text-2xl font-bold text-white mb-4">Top Games</h2>
                         <div className="space-y-3">
                             {(stats?.topGames?.byViews && Array.isArray(stats.topGames.byViews) && stats.topGames.byViews.length > 0) ? (
-                                stats.topGames.byViews.slice(0, 5).map((game: any) => (
+                                stats.topGames.byViews.slice(0, 5).map((game: TopGameListRow) => (
                                     <div key={game.id} className="flex justify-between items-center p-3 bg-white/5 rounded">
                                         <span className="text-white">{game.title}</span>
-                                        <span className="text-gray-300">{game.views} views</span>
+                                        <span className="text-gray-300">{game.views ?? 0} views</span>
                                     </div>
                                 ))
                             ) : (

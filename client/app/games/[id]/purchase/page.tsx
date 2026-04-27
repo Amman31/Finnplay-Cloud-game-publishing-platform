@@ -6,6 +6,7 @@ import Navbar from '@/components/Navbar';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
 import env from '@/config/variables';
+import { getAxiosErrorMessage } from '@/lib/errors';
 
 interface Game {
     id: string;
@@ -130,8 +131,8 @@ export default function PurchasePage() {
             
             // Redirect to processing page
             router.push(`/games/${params.id}/purchase/processing`);
-        } catch (error: any) {
-            setErrors({ general: error.response?.data?.message || 'Purchase failed. Please try again.' });
+        } catch (error: unknown) {
+            setErrors({ general: getAxiosErrorMessage(error, 'Purchase failed. Please try again.') });
             setProcessing(false);
         }
     };

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
+import { getAxiosErrorMessage } from '@/lib/errors';
 
 export default function NewAdPage() {
     const { isAdmin } = useAuth();
@@ -49,8 +50,8 @@ export default function NewAdPage() {
             });
 
             router.push('/admin/ads');
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Failed to create ad');
+        } catch (err: unknown) {
+            setError(getAxiosErrorMessage(err, 'Failed to create ad'));
         } finally {
             setLoading(false);
         }

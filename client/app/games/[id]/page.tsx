@@ -6,8 +6,10 @@ import Link from 'next/link';
 import Navbar from '@/components/Navbar';
 import AdBanner from '@/components/AdBanner';
 import { useAuth } from '@/contexts/AuthContext';
+import axios from 'axios';
 import api from '@/lib/api';
 import env from '@/config/variables';
+import { getAxiosErrorMessage } from '@/lib/errors';
 
 interface Game {
     id: string;
@@ -26,6 +28,15 @@ interface Game {
     imageUrl?: string;
 }
 
+interface GameReview {
+    id: string;
+    userId: string;
+    rating: number;
+    review: string;
+    createdAt: string;
+    user?: { username?: string };
+}
+
 export default function GameDetailPage() {
     const params = useParams();
     const router = useRouter();
@@ -40,7 +51,7 @@ export default function GameDetailPage() {
     const [rating, setRating] = useState(0);
     const [review, setReview] = useState('');
     const [hasRated, setHasRated] = useState(false);
-    const [reviews, setReviews] = useState<any[]>([]);
+    const [reviews, setReviews] = useState<GameReview[]>([]);
     const [loadingReviews, setLoadingReviews] = useState(false);
 
     useEffect(() => {
@@ -60,7 +71,7 @@ export default function GameDetailPage() {
         if (user && ownsGame) {
             if (reviews.length > 0) {
                 // Check if current user's review is in the list
-                const userHasRated = reviews.some((r: any) => r.userId === user.id);
+                const userHasRated = reviews.some((r: GameReview) => r.userId === user.id);
                 setHasRated(userHasRated);
             } else {
                 // If no reviews yet, check rating status via API
@@ -154,7 +165,7 @@ export default function GameDetailPage() {
         // Track play event
         try {
             await api.post(`/games/${params.id}/play`);
-        } catch (error: any) {
+        } catch (error: unknown) {
             // If tracking fails, still allow play but log error
             console.error('Failed to track play event:', error);
             // Don't block the user from playing if analytics fails
@@ -215,10 +226,10 @@ export default function GameDetailPage() {
             setTimeout(() => {
                 setShowDownloadModal(false);
             }, 2000);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Download failed:', error);
             setShowDownloadModal(false);
-            alert(error.response?.data?.message || 'Failed to download game');
+            alert(getAxiosErrorMessage(error, 'Failed to download game'));
         }
     };
 
@@ -251,12 +262,16 @@ export default function GameDetailPage() {
             await fetchReviews();
             // Double-check rating status after refresh
             await checkIfRated();
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to submit rating:', error);
-            const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Failed to submit rating';
+            const errorMessage = getAxiosErrorMessage(error, 'Failed to submit rating');
             alert(errorMessage);
             // If user already reviewed, close the modal and refresh
-            if (error.response?.status === 400 && (errorMessage.includes('already written') || errorMessage.includes('already'))) {
+            if (
+                axios.isAxiosError(error) &&
+                error.response?.status === 400 &&
+                (errorMessage.includes('already written') || errorMessage.includes('already'))
+            ) {
                 setShowRatingModal(false);
                 setHasRated(true);
                 await fetchGame();

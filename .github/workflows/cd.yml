@@ -18,10 +18,15 @@ jobs:
     env:
       REGISTRY: ghcr.io
       IMAGE_TAG: ${{ github.sha }}
-      REGISTRY_PREFIX: ghcr.io/${{ github.repository_owner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # GHCR image names must be lowercase; repository_owner can be mixed case (e.g. Amman31).
+      - name: Set lowercase registry prefix
+        run: |
+          owner_lc=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')
+          echo "REGISTRY_PREFIX=ghcr.io/${owner_lc}" >> "$GITHUB_ENV"
 
       - name: Login to GHCR
         uses: docker/login-action@v3
@@ -68,7 +73,7 @@ jobs:
             export IMAGE_TAG=${{ env.IMAGE_TAG }}
             export REGISTRY_PREFIX=${{ env.REGISTRY_PREFIX }}
             if [ -n "${{ secrets.GHCR_PULL_TOKEN }}" ]; then
-              echo "${{ secrets.GHCR_PULL_TOKEN }}" | docker login ghcr.io -u "${{ github.repository_owner }}" --password-stdin
+              echo "${{ secrets.GHCR_PULL_TOKEN }}" | docker login ghcr.io -u "$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" --password-stdin
             fi
             if ! command -v node >/dev/null 2>&1; then
               echo "Install Node.js on the manager (see docs/deployment-azure.md), then re-run this workflow."

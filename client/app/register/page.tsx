@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
+import { getAxiosErrorMessage } from '@/lib/errors';
 
 export default function RegisterPage() {
     const [username, setUsername] = useState('');
@@ -30,8 +31,8 @@ export default function RegisterPage() {
         try {
             await register(username, email, password);
             router.push('/');
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Registration failed');
+        } catch (err: unknown) {
+            setError(getAxiosErrorMessage(err, 'Registration failed'));
         } finally {
             setLoading(false);
         }

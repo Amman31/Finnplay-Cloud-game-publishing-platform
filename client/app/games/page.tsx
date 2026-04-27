@@ -34,12 +34,12 @@ export default function GamesPage() {
 
     const fetchGames = async () => {
         try {
-            const params: any = {};
+            const params: Record<string, string> = {};
             if (search) params.search = search;
             if (category) params.category = category;
 
             const response = await api.get('/games', { params });
-            let allGames = response.data.games;
+            const allGames = response.data.games as Game[];
 
             setGames(allGames);
         } catch (error) {
@@ -49,7 +49,7 @@ export default function GamesPage() {
         }
     };
 
-    const handleGameCardClick = async (gameId: string, e: React.MouseEvent) => {
+    const handleGameCardClick = async (gameId: string) => {
         // Track view event when clicking on game card
         try {
             await api.post(`/games/${gameId}/view`);
@@ -103,7 +103,7 @@ export default function GamesPage() {
                             <React.Fragment key={game.id}>
                                 <Link
                                     href={`/games/${game.id}`}
-                                    onClick={(e) => handleGameCardClick(game.id, e)}
+                                    onClick={() => handleGameCardClick(game.id)}
                                     className="bg-white/10 backdrop-blur-lg rounded-xl overflow-hidden shadow-lg hover:scale-102 ease-in-out transform duration-300 transition-transform border border-white/20 flex flex-col"
                                 >
                                     <div className="w-full aspect-[2/3] bg-gray-800 flex items-center justify-center relative overflow-hidden">

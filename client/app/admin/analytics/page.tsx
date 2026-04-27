@@ -5,6 +5,15 @@ import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
+import { getAxiosErrorMessage } from '@/lib/errors';
+import type {
+    AnalyticsDashboardData,
+    CategoryStatRow,
+    EventBreakdownRow,
+    TimeSeriesBucket,
+    TopGameListRow,
+    TopGameRevenueRow,
+} from '@/types/dashboard';
 import {
     LineChart,
     Line,
@@ -28,7 +37,7 @@ const COLORS = ['#3b82f6', '#8b5cf6', '#10b981', '#f59e0b', '#ef4444', '#06b6d4'
 export default function AnalyticsPage() {
     const { isAdmin, loading: authLoading } = useAuth();
     const router = useRouter();
-    const [analytics, setAnalytics] = useState<any>(null);
+    const [analytics, setAnalytics] = useState<AnalyticsDashboardData | null>(null);
     const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -52,14 +61,10 @@ export default function AnalyticsPage() {
             if (response.data?.timeSeries?.revenue) {
                 console.log('Revenue data:', response.data.timeSeries.revenue);
             }
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Failed to fetch analytics:', error);
             setAnalytics(null);
-            const msg =
-                error?.response?.data?.error ||
-                error?.message ||
-                'The analytics service is unavailable.';
-            setLoadError(msg);
+            setLoadError(getAxiosErrorMessage(error, 'The analytics service is unavailable.'));
         } finally {
             setLoading(false);
         }
@@ -92,9 +97,9 @@ export default function AnalyticsPage() {
     }
 
     // Prepare data for charts - ensure all data is dynamic from API
-    const prepareTimeSeriesData = (data: any[], isRevenue = false) => {
+    const prepareTimeSeriesData = (data: TimeSeriesBucket[] | undefined, isRevenue = false): Map<string, number> => {
         if (!data || !Array.isArray(data)) return new Map();
-        const dataMap = new Map();
+        const dataMap = new Map<string, number>();
         data.forEach(item => {
             if (item && item._id) {
                 // For revenue, use the revenue field; for others, use count
@@ -129,7 +134,7 @@ export default function AnalyticsPage() {
 
     // Category data from actual database - ensure dynamic
     const categoryData = (analytics?.categoryStats && Array.isArray(analytics.categoryStats))
-        ? analytics.categoryStats.map((cat: any) => ({
+        ? analytics.categoryStats.map((cat: CategoryStatRow) => ({
             name: cat._id || 'Unknown',
             games: cat.count || 0,
             views: cat.totalViews || 0,
@@ -140,7 +145,7 @@ export default function AnalyticsPage() {
 
     // Event breakdown from actual analytics data
     const eventData = (analytics?.eventBreakdown && Array.isArray(analytics.eventBreakdown))
-        ? analytics.eventBreakdown.map((event: any) => ({
+        ? analytics.eventBreakdown.map((event: EventBreakdownRow) => ({
             name: event._id ? (event._id.charAt(0).toUpperCase() + event._id.slice(1)) : 'Unknown',
             value: event.count || 0
         }))
@@ -148,7 +153,7 @@ export default function AnalyticsPage() {
 
     // Top games by revenue from actual purchase data
     const topGamesByRevenue = (analytics?.topGames?.byRevenue && Array.isArray(analytics.topGames.byRevenue))
-        ? analytics.topGames.byRevenue.map((game: any) => ({
+        ? analytics.topGames.byRevenue.map((game: TopGameRevenueRow) => ({
             name: game.title ? (game.title.length > 20 ? game.title.substring(0, 20) + '...' : game.title) : 'Unknown',
             revenue: game.revenue || 0,
             purchases: game.purchases || 0
@@ -173,7 +178,7 @@ export default function AnalyticsPage() {
                         </p>
                         <p className="text-gray-300 text-xs mt-2">
                             €{(analytics?.stats?.totalRevenue || 0).toFixed(2)} from purchases
-                            {analytics?.stats?.adRevenue > 0 && (
+                            {(analytics?.stats?.adRevenue ?? 0) > 0 && (
                                 <span> + €{(analytics?.stats?.adRevenue || 0).toFixed(2)} from ads</span>
                             )}
                         </p>
@@ -296,7 +301,9 @@ export default function AnalyticsPage() {
                                             borderRadius: '8px',
                                             color: '#fff'
                                         }}
-                                        formatter={(value: any) => `€${Number(value).toFixed(2)}`}
+                                        formatter={(value: number | string) =>
+                                            `€${Number(value).toFixed(2)}`
+                                        }
                                     />
                                     <Legend />
                                     <Line
@@ -363,7 +370,7 @@ export default function AnalyticsPage() {
                                         fill="#8884d8"
                                         dataKey="value"
                                     >
-                                        {eventData.map((entry: any, index: number) => (
+                                        {eventData.map((entry, index: number) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>
@@ -389,13 +396,14 @@ export default function AnalyticsPage() {
                                         borderRadius: '8px',
                                         color: '#fff'
                                     }}
-                                    formatter={(value: any, name: string) => {
+                                    formatter={(value: number | string, name: string) => {
                                         if (name === 'Revenue') {
                                             return `€${Number(value).toFixed(2)}`;
-                                        } else if (name === 'Purchases') {
+                                        }
+                                        if (name === 'Purchases') {
                                             return Number(value).toLocaleString();
                                         }
-                                        return value;
+                                        return String(value);
                                     }}
                                 />
                                 <Legend />
@@ -422,7 +430,7 @@ export default function AnalyticsPage() {
                         <h2 className="text-2xl font-bold text-white mb-4">Top Games by Views</h2>
                         <div className="space-y-3">
                             {(analytics?.topGames?.byViews && Array.isArray(analytics.topGames.byViews) && analytics.topGames.byViews.length > 0) ? (
-                                analytics.topGames.byViews.slice(0, 5).map((game: any, index: number) => (
+                                analytics.topGames.byViews.slice(0, 5).map((game: TopGameListRow, index: number) => (
                                     <div key={game.id} className="flex justify-between items-center p-4 bg-white/5 rounded">
                                         <div className="flex items-center gap-3">
                                             <span className="text-2xl font-bold text-yellow-400 w-8">#{index + 1}</span>
@@ -434,7 +442,7 @@ export default function AnalyticsPage() {
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-blue-400 font-bold">{game.views.toLocaleString()}</p>
+                                            <p className="text-blue-400 font-bold">{(game.views ?? 0).toLocaleString()}</p>
                                             <p className="text-gray-300 text-xs">views</p>
                                         </div>
                                     </div>
@@ -450,7 +458,7 @@ export default function AnalyticsPage() {
                         <h2 className="text-2xl font-bold text-white mb-4">Top Games by Downloads</h2>
                         <div className="space-y-3">
                             {(analytics?.topGames?.byDownloads && Array.isArray(analytics.topGames.byDownloads) && analytics.topGames.byDownloads.length > 0) ? (
-                                analytics.topGames.byDownloads.slice(0, 5).map((game: any, index: number) => (
+                                analytics.topGames.byDownloads.slice(0, 5).map((game: TopGameListRow, index: number) => (
                                     <div key={game.id} className="flex justify-between items-center p-4 bg-white/5 rounded">
                                         <div className="flex items-center gap-3">
                                             <span className="text-2xl font-bold text-yellow-400 w-8">#{index + 1}</span>
@@ -462,7 +470,7 @@ export default function AnalyticsPage() {
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <p className="text-purple-300 font-bold">{game.downloads.toLocaleString()}</p>
+                                            <p className="text-purple-300 font-bold">{(game.downloads ?? 0).toLocaleString()}</p>
                                             <p className="text-gray-300 text-xs">downloads</p>
                                         </div>
                                     </div>

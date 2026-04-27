@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 import Navbar from '@/components/Navbar';
+import { getAxiosErrorMessage } from '@/lib/errors';
 
 export default function LoginPage() {
     const [email, setEmail] = useState('');
@@ -29,8 +30,8 @@ export default function LoginPage() {
         try {
             await login(email, password);
             router.push('/');
-        } catch (err: any) {
-            setError(err.response?.data?.message || 'Login failed');
+        } catch (err: unknown) {
+            setError(getAxiosErrorMessage(err, 'Login failed'));
         } finally {
             setLoading(false);
         }
@@ -95,7 +96,7 @@ export default function LoginPage() {
                 </form>
 
                 <p className="mt-4 text-center text-gray-300">
-                    Don't have an account?{' '}
+                    Don&apos;t have an account?{' '}
                     <Link href="/register" className="text-blue-400 hover:text-blue-300 font-semibold">
                         Register
                     </Link>

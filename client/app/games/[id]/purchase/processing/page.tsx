@@ -5,6 +5,15 @@ import { useParams, useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
+import { getAxiosErrorMessage } from '@/lib/errors';
+
+interface PaymentSessionData {
+    gameId: string;
+    cardNumber: string;
+    cardExpiry: string;
+    cardCvc: string;
+    cardName: string;
+}
 
 export default function PaymentProcessingPage() {
     const params = useParams();
@@ -30,7 +39,7 @@ export default function PaymentProcessingPage() {
             return;
         }
 
-        const paymentData = JSON.parse(paymentDataStr);
+        const paymentData = JSON.parse(paymentDataStr) as PaymentSessionData;
         
         // Clear payment data from sessionStorage
         sessionStorage.removeItem('paymentData');
@@ -38,7 +47,7 @@ export default function PaymentProcessingPage() {
         processPayment(paymentData);
     }, [params.id, user, router]);
 
-    const processPayment = async (paymentData: any) => {
+    const processPayment = async (paymentData: PaymentSessionData) => {
         const gameId = paymentData.gameId;
         
         try {
@@ -67,10 +76,10 @@ export default function PaymentProcessingPage() {
             setStatus('success');
             await new Promise(resolve => setTimeout(resolve, 1000));
             router.push(`/games/${gameId}?purchased=true`);
-        } catch (error: any) {
+        } catch (error: unknown) {
             console.error('Payment processing error:', error);
             setStatus('error');
-            setErrorMessage(error.response?.data?.error || error.response?.data?.message || 'Payment failed. Please try again.');
+            setErrorMessage(getAxiosErrorMessage(error, 'Payment failed. Please try again.'));
             
             // Redirect back to purchase page after 3 seconds
             setTimeout(() => {

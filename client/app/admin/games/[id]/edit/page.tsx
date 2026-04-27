@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
-import env from '@/config/variables';
+import { getAxiosErrorMessage } from '@/lib/errors';
 
 export default function EditGamePage() {
     const { isAdmin, loading: authLoading } = useAuth();
@@ -94,8 +94,8 @@ export default function EditGamePage() {
             });
 
             router.push('/admin/games');
-        } catch (err: any) {
-            setError(err.response?.data?.error || err.response?.data?.message || 'Failed to update game');
+        } catch (err: unknown) {
+            setError(getAxiosErrorMessage(err, 'Failed to update game'));
         } finally {
             setSaving(false);
         }

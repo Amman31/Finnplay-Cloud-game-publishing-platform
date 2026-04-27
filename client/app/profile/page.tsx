@@ -173,7 +173,7 @@ export default function ProfilePage() {
                             <h2 className="text-2xl font-bold text-white mb-6">My Games ({completedPurchases.length})</h2>
                             {completedPurchases.length === 0 ? (
                                 <div className="text-center py-12">
-                                    <p className="text-gray-200 text-lg mb-4">You haven't purchased any games yet.</p>
+                                    <p className="text-gray-200 text-lg mb-4">You haven&apos;t purchased any games yet.</p>
                                     <Link
                                         href="/games"
                                         className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold px-6 py-3 rounded-lg transition"

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
 import { useAuth } from '@/contexts/AuthContext';
 import api from '@/lib/api';
+import { getAxiosErrorMessage } from '@/lib/errors';
 
 export default function NewGamePage() {
     const { isAdmin } = useAuth();
@@ -51,8 +52,8 @@ export default function NewGamePage() {
             });
 
             router.push('/admin/games');
-        } catch (err: any) {
-            setError(err.response?.data?.error || err.response?.data?.message || 'Failed to create game');
+        } catch (err: unknown) {
+            setError(getAxiosErrorMessage(err, 'Failed to create game'));
         } finally {
             setLoading(false);
         }
