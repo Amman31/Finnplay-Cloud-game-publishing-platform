@@ -9,7 +9,7 @@
 
 ## New Here? Start Here
 
-If you are new to cloud/deployment, follow this first:
+Project details:
 
 - `docs/BEGINNER_STEP_BY_STEP.md`
 - `docs/development-workflow.md` (Mode 1: coding workflow)
